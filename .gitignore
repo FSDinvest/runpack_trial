@@ -1,0 +1,7 @@
+__pycache__/
+*.egg-info/
+build/
+dist/
+
+# Build key matching the runtime: keep it private, never commit
+.pyarmor.ikey
