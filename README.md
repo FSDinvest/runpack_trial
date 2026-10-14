@@ -19,30 +19,47 @@ instead of copying the runtime into every module. It is the same idea as Exo's `
 
 - Runtime id: `000000` (PyArmor trial, shared by every trial user).
 - Platform: `linux.x86_64` (what Odoo.sh runs). It does not run on Windows or macOS.
-- Tested with: Python 3.12 (Odoo.sh stage).
+
+The `.so` in `pyarmor_runtime_000000/` is specific to one CPython version: `pyarmor.cli.core` ships a
+different binary per Python minor version, so a single tag can only serve one. Pin the tag that matches
+the Python version of the Odoo.sh stage you are building for.
+
+| Tag     | Python (Odoo.sh stage) | Odoo version seen so far |
+|---------|-------------------------|---------------------------|
+| `v0.1.0`| 3.12                     | Odoo 18 (CHILi)            |
+| `v0.2.0`| 3.14                     | Odoo 20                    |
 
 ## Use it in a project
 
-Add this line to the `requirements.txt` at the root of the project (the repository Odoo.sh builds):
+Add the line matching your stage's Python version to the `requirements.txt` at the root of the project
+(the repository Odoo.sh builds):
 
 ```
-runpack_trial @ git+https://github.com/FSDinvest/runpack_trial.git@v0.1.0
+runpack_trial @ git+https://github.com/FSDinvest/runpack_trial.git@v0.1.0   # Python 3.12
+runpack_trial @ git+https://github.com/FSDinvest/runpack_trial.git@v0.2.0   # Python 3.14
 ```
 
 Pin a tag so the runtime only changes when you decide. The build must be able to read this repository
-(public, or a token in the URL for a private one).
+(public, or a token in the URL for a private one). If the Odoo.sh stage's Python version does not match
+the tag, the module fails to import with an `undefined symbol` error from `pyarmor_runtime.so`.
 
 Odoo.sh installs `requirements.txt` on every build. Nothing else is needed: the modules find
 `pyarmor_runtime_000000` on the Python path.
 
 ## Build modules against this runtime
 
-The modules must be generated with this runtime instead of embedding one:
+Build with the **same Python version** as the runtime you are targeting (`pyarmor.cli.core` resolves its
+own binary from the interpreter that runs it, and pulls in `pyarmor.cli.core.linux` for the cross-platform
+`.so` on first use):
 
 ```bash
-pyarmor gen -r -O dist/<module> --platform linux.x86_64 \
-    --use-runtime /path/to/runpack_trial/pyarmor_runtime_000000 <module_source>
+# use the Python interpreter matching the target tag above, e.g. a 3.14 install for v0.2.0
+python -m pyarmor.cli gen -r -O dist/<module> --platform linux.x86_64 \
+    --use-runtime /path/to/runpack_trial <module_source>
 ```
+
+`--use-runtime` points at the **repository root** (where `.pyarmor.ikey` lives), not at the
+`pyarmor_runtime_000000` folder itself.
 
 Keep `__manifest__.py`, XML and CSV files in clear text; only the `.py` files are obfuscated.
 Do not put a `pyarmor_runtime_000000` folder inside the modules.
